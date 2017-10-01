@@ -31,23 +31,18 @@ int lsx_nspstartread(sox_format_t * ft)
   unsigned short channels = 0;
   sox_encoding_t enc = SOX_ENCODING_SIGN2;
   unsigned short bits = 16;
-  uint32_t frames;
   double rate = 0.0;
   uint32_t offset = 0;
-  uint32_t blocksize = 0;
-  unsigned short looptype;
   int i;
-  off_t seekto = 0;
   size_t ssndsize = 0;
 
-  char *date;
+  char date[20];
   char *comment;
   uint16_t maxabschan[8];
   uint32_t datalength;
   uint32_t samplerate;
   int numchannels;
 
-  int rc;
   uint8_t trash8;
 
   /* FORM chunk */
@@ -69,7 +64,7 @@ int lsx_nspstartread(sox_format_t * ft)
     if (strncmp(buf, "HEDR", (size_t)4) == 0) {
       /* HEDR chunk */
       lsx_readdw(ft, &chunksize);
-      lsx_reads(ft, date, 20);
+      lsx_reads(ft, date, (size_t)20);
       lsx_readdw(ft, &samplerate);
       rate = (double)samplerate;
       lsx_readdw(ft, &datalength);
@@ -88,8 +83,8 @@ int lsx_nspstartread(sox_format_t * ft)
     } else if (strncmp(buf, "HDR8", (size_t)4) == 0) {
       /* HDR8 chunk */
       lsx_readdw(ft, &chunksize);
-      lsx_reads(ft, date, 20);
-      lsx_readdw(ft, samplerate);
+      lsx_reads(ft, date, (size_t)20);
+      lsx_readdw(ft, &samplerate);
       rate = (double)samplerate;
       lsx_readdw(ft, &datalength);
       lsx_readw(ft, &maxabschan[0]);
@@ -117,7 +112,7 @@ int lsx_nspstartread(sox_format_t * ft)
       /* NOTE chunk */
       lsx_readdw(ft, &chunksize);
       comment = lsx_malloc(chunksize * sizeof(char*));
-      lsx_reads(ft, comment, chunksize);
+      lsx_reads(ft, comment, (size_t)chunksize);
       lsx_debug("NSP comment: %s", comment);
       free(comment);
     } else if (strncmp(buf, "MARK", (size_t)4) == 0) {
