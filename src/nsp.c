@@ -21,6 +21,8 @@
 #include <errno.h>
 #include <limits.h>
 
+int lsx_nspstartread(sox_format_t * ft);
+
 int lsx_nspstartread(sox_format_t * ft)
 {
   char buf[5];
@@ -34,13 +36,15 @@ int lsx_nspstartread(sox_format_t * ft)
   uint32_t offset = 0;
   uint32_t blocksize = 0;
   unsigned short looptype;
-  int i, j;
+  int i;
   off_t seekto = 0;
   size_t ssndsize = 0;
 
   char *date;
+  char *comment;
   uint16_t maxabschan[8];
   uint32_t datalength;
+  uint32_t samplerate;
   int numchannels;
 
   int rc;
@@ -66,7 +70,8 @@ int lsx_nspstartread(sox_format_t * ft)
       /* HEDR chunk */
       lsx_readdw(ft, &chunksize);
       lsx_reads(ft, date, 20);
-      lsx_readdw(ft, &(ft->signal.rate));
+      lsx_readdw(ft, &samplerate);
+      rate = (double)samplerate;
       lsx_readdw(ft, &datalength);
       lsx_readw(ft, &maxabschan[0]);
       lsx_readw(ft, &maxabschan[1]);
@@ -79,12 +84,13 @@ int lsx_nspstartread(sox_format_t * ft)
       } else {
         ft->signal.channels = 2;
       }
-
+      lsx_seeki(ft,(off_t)datalength,SEEK_SET);
     } else if (strncmp(buf, "HDR8", (size_t)4) == 0) {
       /* HDR8 chunk */
       lsx_readdw(ft, &chunksize);
       lsx_reads(ft, date, 20);
-      lsx_readdw(ft, &(ft->signal.rate));
+      lsx_readdw(ft, samplerate);
+      rate = (double)samplerate;
       lsx_readdw(ft, &datalength);
       lsx_readw(ft, &maxabschan[0]);
       lsx_readw(ft, &maxabschan[1]);
@@ -106,7 +112,7 @@ int lsx_nspstartread(sox_format_t * ft)
         lsx_fail_errno(ft,SOX_EHDR,"No channels defined");
       }
       ft->signal.channels = numchannels;
-
+      lsx_seeki(ft,(off_t)datalength,SEEK_SET);
     } else if (strncmp(buf, "NOTE", (size_t)4) == 0) {
       /* NOTE chunk */
       lsx_readdw(ft, &chunksize);
@@ -136,19 +142,6 @@ int lsx_nspstartread(sox_format_t * ft)
       break;
   }
 
-  /*
-   * if a pipe, we lose all chunks after sound.
-   * Like, say, instrument loops.
-   */
-  if (ft->seekable) {
-    if (seekto > 0)
-      lsx_seeki(ft, seekto, SEEK_SET);
-    else {
-      lsx_fail_errno(ft,SOX_EOF,"NSP: no sound data on input file");
-      return(SOX_EOF);
-    }
-  }
-
   ssndsize -= offset;
   while (offset-- > 0) {
     if (lsx_readb(ft, &trash8) == SOX_EOF) {
@@ -159,4 +152,24 @@ int lsx_nspstartread(sox_format_t * ft)
 
   return lsx_check_read_params(
       ft, channels, rate, enc, bits, (uint64_t)ssndsize, sox_false);
+}
+
+static int lsx_nspstopread(sox_format_t * ft)
+{
+    ft->sox_errno = SOX_SUCCESS;
+
+    return SOX_SUCCESS;
+}
+
+LSX_FORMAT_HANDLER(nsp)
+{
+  static char const * const names[] = {"nsp", NULL };
+  static sox_format_handler_t const handler = {SOX_LIB_VERSION_CODE,
+    "Computerized Speech Lab NSP file",
+    names, SOX_FILE_LIT_END,
+    lsx_nspstartread, lsx_rawread, lsx_nspstopread,
+    NULL, NULL, NULL,
+    NULL, NULL, NULL, 0
+  };
+  return &handler;
 }
