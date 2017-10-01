@@ -110,7 +110,6 @@ int lsx_nspstartread(sox_format_t * ft)
       unsigned char nullc = 0;
       /* NOTE chunk */
       lsx_readdw(ft, &chunksize);
-      lsx_debug("NSP chunksize: %d", chunksize);
       comment = lsx_malloc(chunksize * sizeof(char*));
       lsx_reads(ft, comment, (size_t)chunksize);
       if(strlen(comment) != 0)
