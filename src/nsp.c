@@ -32,7 +32,7 @@ int lsx_nspstartread(sox_format_t * ft)
   sox_encoding_t enc = SOX_ENCODING_SIGN2;
   unsigned short bits = 16;
   double rate = 0.0;
-  uint32_t offset = 0;
+  uint64_t seekto = 0;
   int i;
   size_t ssndsize = 0;
 
@@ -79,7 +79,6 @@ int lsx_nspstartread(sox_format_t * ft)
       } else {
         ft->signal.channels = 2;
       }
-      lsx_seeki(ft,(off_t)datalength,SEEK_SET);
     } else if (strncmp(buf, "HDR8", (size_t)4) == 0) {
       /* HDR8 chunk */
       lsx_readdw(ft, &chunksize);
@@ -107,17 +106,26 @@ int lsx_nspstartread(sox_format_t * ft)
         lsx_fail_errno(ft,SOX_EHDR,"No channels defined");
       }
       ft->signal.channels = numchannels;
-      lsx_seeki(ft,(off_t)datalength,SEEK_SET);
     } else if (strncmp(buf, "NOTE", (size_t)4) == 0) {
+      unsigned char nullc = 0;
       /* NOTE chunk */
       lsx_readdw(ft, &chunksize);
+      lsx_debug("NSP chunksize: %d", chunksize);
       comment = lsx_malloc(chunksize * sizeof(char*));
       lsx_reads(ft, comment, (size_t)chunksize);
-      lsx_debug("NSP comment: %s", comment);
+      if(strlen(comment) != 0)
+        lsx_debug("NSP comment: %s %d", comment);
       free(comment);
-    } else if (strncmp(buf, "MARK", (size_t)4) == 0) {
-    } else if (strncmp(buf, "INST", (size_t)4) == 0) {
-    } else if (strncmp(buf, "COMT", (size_t)4) == 0) {
+      lsx_readb(ft, &nullc);
+    } else if (strncmp(buf, "SDA_", (size_t)4) == 0) {
+      lsx_readdw(ft, &chunksize);
+      ssndsize = chunksize;
+      /* if can't seek, just do sound now */
+      if (!ft->seekable)
+        break;
+      /* else, seek to end of sound and hunt for more */
+      seekto = lsx_tell(ft);
+      lsx_seeki(ft, (off_t)chunksize, SEEK_CUR);
     } else {
       if (lsx_eof(ft))
         break;
@@ -137,16 +145,17 @@ int lsx_nspstartread(sox_format_t * ft)
       break;
   }
 
-  ssndsize -= offset;
-  while (offset-- > 0) {
-    if (lsx_readb(ft, &trash8) == SOX_EOF) {
-      lsx_fail_errno(ft,errno,"unexpected EOF while skipping NSP offset");
+  if (ft->seekable) {
+    if (seekto > 0)
+      lsx_seeki(ft, seekto, SEEK_SET);
+    else {
+      lsx_fail_errno(ft,SOX_EOF,"NSP: no sound data on input file");
       return(SOX_EOF);
     }
   }
 
   return lsx_check_read_params(
-      ft, channels, rate, enc, bits, (uint64_t)ssndsize, sox_false);
+      ft, channels, rate, enc, bits, (uint64_t)ssndsize/2, sox_false);
 }
 
 static int lsx_nspstopread(sox_format_t * ft)
@@ -162,7 +171,7 @@ LSX_FORMAT_HANDLER(nsp)
   static sox_format_handler_t const handler = {SOX_LIB_VERSION_CODE,
     "Computerized Speech Lab NSP file",
     names, SOX_FILE_LIT_END,
-    lsx_nspstartread, lsx_rawread, lsx_nspstopread,
+    lsx_nspstartread, lsx_rawread, NULL,
     NULL, NULL, NULL,
     NULL, NULL, NULL, 0
   };
