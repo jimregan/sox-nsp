@@ -1085,7 +1085,7 @@ See also the
 .BR vol ,
 and
 .B gain
-effects, and see \fBInput File Balancing\fR above.
+effects, and see \fBInput File Combining\fR above.
 .SS Input & Output File Format Options
 These options apply to the input or output file whose name they
 immediately precede on the command line and are used mainly when
@@ -2699,7 +2699,7 @@ as detailed in the following table:
 .ne 6
 .TS
 center;
-lB lw52.
+lB lw51.
 \-M/\-I/\-L	Phase response = minimum/intermediate/linear
 \-s	Steep filter (band-width = 99%)
 \-a	Allow aliasing/imaging above the pass-band
@@ -3235,6 +3235,10 @@ A negative
 .I num
 effectively increases the `brightness' of the spectrogram display,
 and vice versa.
+.IP \fB\-n\fR
+Sets the upper limit of the Z axis so that the loudest pixels
+are shown using the brightest colour in the palette - a kind of
+automatic \fB\-Z\fR flag.
 .IP \fB\-q\ \fInum\fR
 Sets the Z-axis quantisation, i.e. the number of different colours (or
 intensities) in which to render Z-axis

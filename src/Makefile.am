@@ -78,8 +78,7 @@ libsox_la_SOURCES += \
 	rate_filters.h rate_half_fir.h rate_poly_fir0.h rate_poly_fir.h \
 	remix.c repeat.c reverb.c reverse.c silence.c sinc.c skeleff.c \
 	speed.c splice.c stat.c stats.c stretch.c swap.c \
-	synth.c tempo.c tremolo.c trim.c upsample.c vad.c vol.c \
-	ignore-warning.h
+	synth.c tempo.c tremolo.c trim.c upsample.c vad.c vol.c
 if HAVE_PNG
     libsox_la_SOURCES += spectrogram.c
 endif
@@ -95,7 +94,7 @@ libsox_la_LIBADD += @GOMP_LIBS@
 
 libsox_la_CFLAGS = @WARN_CFLAGS@
 libsox_la_LDFLAGS = @APP_LDFLAGS@ -version-info @SHLIB_VERSION@ \
-  -export-symbols-regex '^(sox_.*|lsx_(check_read_params|(close|open)_dllibrary|(debug(_more|_most)?|fail|report|warn)_impl|eof|error|fail_errno|filelength|find_(enum_(text|value)|file_extension)|flush|getopt(_init)?|lpc10_(create_(de|en)coder_state|(de|en)code)|raw(read|write)|read(_b_buf|buf|chars)|realloc|rewind|seeki|sigfigs3p?|strcasecmp|tell|unreadb|write(b|_b_buf|buf|s)))$$'
+  -export-symbols-regex '^(sox_.*|lsx_(([cm]|re)alloc.*|check_read_params|(close|open)_dllibrary|(debug(_more|_most)?|fail|report|warn)_impl|eof|error|fail_errno|filelength|find_(enum_(text|value)|file_extension)|flush|getopt(_init)?|lpc10_(create_(de|en)coder_state|(de|en)code)|raw(read|write)|read(_b_buf|buf|chars)|rewind|seeki|sigfigs3p?|strcasecmp|strdup|tell|unreadb|write(b|_b_buf|buf|s)))$$'
 
 if HAVE_WIN32_LTDL
   libsox_la_SOURCES += win32-ltdl.c win32-ltdl.h

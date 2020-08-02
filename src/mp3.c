@@ -186,6 +186,7 @@ static const char* const lame_library_names[] =
   LAME_FUNC_ID3(f,x, size_t, lame_get_id3v2_tag, (lame_global_flags *, unsigned char*, size_t)) \
   LAME_FUNC_ID3(f,x, int, id3tag_set_fieldvalue, (lame_global_flags *, const char *))
 
+#ifdef HAVE_TWOLAME
 static const char* const twolame_library_names[] =
 {
 #ifdef DL_TWOLAME
@@ -194,6 +195,7 @@ static const char* const twolame_library_names[] =
 #endif
   NULL
 };
+#endif
 
 #ifdef DL_TWOLAME
   #define TWOLAME_FUNC LSX_DLENTRY_DYNAMIC
@@ -389,7 +391,7 @@ static int startread(sox_format_t * ft)
     if (!ft->signal.length)
 #endif
       if (!ignore_length)
-        ft->signal.length = mp3_duration_ms(ft);
+        ft->signal.length = mp3_duration(ft);
   }
 
   p->mad_stream_init(&p->Stream);
@@ -464,7 +466,6 @@ static int startread(sox_format_t * ft)
   if (ignore_length)
     ft->signal.length = SOX_UNSPEC;
   else {
-    ft->signal.length = (uint64_t)(ft->signal.length * .001 * ft->signal.rate + .5);
     ft->signal.length *= ft->signal.channels;  /* Keep separate from line above! */
   }
 

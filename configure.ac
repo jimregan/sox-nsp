@@ -168,12 +168,8 @@ if test "$GCC" = "yes"; then
     gccver=`$CC -dumpversion`
     AC_MSG_RESULT($gccver)
 
-    CFLAGS="$CFLAGS -Wall -W -Wmissing-prototypes -Wstrict-prototypes -pedantic"
+    CFLAGS="$CFLAGS -Wall -Wmissing-prototypes -Wstrict-prototypes"
 
-    AS_VERSION_COMPARE([$gccver], [4.3],
-       [WARN_CFLAGS="-Wconversion"],
-       [WARN_CFLAGS="-Wtraditional-conversion"],
-       [WARN_CFLAGS="-Wtraditional-conversion"])
     dnl Define stricter policy on GNU/Linux, all symbols must be resolved
     case $target in
       *linux* | *solaris*)
@@ -207,7 +203,7 @@ AC_HEADER_STDC
 AC_CHECK_HEADERS(fcntl.h unistd.h byteswap.h sys/stat.h sys/time.h sys/timeb.h sys/types.h sys/utsname.h termios.h glob.h fenv.h)
 
 dnl Checks for library functions.
-AC_CHECK_FUNCS(strcasecmp strdup popen vsnprintf gettimeofday mkstemp fmemopen)
+AC_CHECK_FUNCS(strcasecmp strdup popen vsnprintf gettimeofday mkstemp fmemopen sigaction)
 
 dnl Check if math library is needed.
 AC_SEARCH_LIBS([pow], [m])
