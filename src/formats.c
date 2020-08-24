@@ -334,13 +334,11 @@ static void set_endiannesses(sox_format_t * ft)
 
 static sox_bool is_seekable(sox_format_t const * ft)
 {
-  struct stat st;
-
   assert(ft);
   if (!ft->fp)
     return sox_false;
-  fstat(fileno((FILE*)ft->fp), &st);
-  return ((st.st_mode & S_IFMT) == S_IFREG);
+
+  return !fseek(ft->fp, 0, SEEK_CUR);
 }
 
 /* check that all settings have been given */
@@ -348,8 +346,8 @@ static int sox_checkformat(sox_format_t * ft)
 {
   ft->sox_errno = SOX_SUCCESS;
 
-  if (!ft->signal.rate) {
-    lsx_fail_errno(ft,SOX_EFMT,"sampling rate was not specified");
+  if (ft->signal.rate <= 0) {
+    lsx_fail_errno(ft, SOX_EFMT, "sample rate zero or negative");
     return SOX_EOF;
   }
   if (!ft->signal.precision) {
@@ -1240,8 +1238,9 @@ sox_get_format_fns(void)
     return s_sox_format_fns;
 }
 
+static unsigned nformats = NSTATIC_FORMATS;
+
 #ifdef HAVE_LIBLTDL /* Plugin format handlers */
-  static unsigned nformats = NSTATIC_FORMATS;
 
   static int init_format(const char *file, lt_ptr data)
   {
@@ -1324,7 +1323,7 @@ sox_format_handler_t const * sox_find_format(char const * name0, sox_bool no_dev
     char * pos = strchr(name, ';');
     if (pos) /* Use only the 1st clause of a mime string */
       *pos = '\0';
-    for (f = 0; s_sox_format_fns[f].fn; ++f) {
+    for (f = 0; f < nformats; ++f) {
       sox_format_handler_t const * handler = s_sox_format_fns[f].fn();
 
       if (!(no_dev && (handler->flags & SOX_FILE_DEVICE)))
