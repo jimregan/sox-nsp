@@ -1,6 +1,7 @@
 dnl Process this file with autoconf to produce a configure script.
 
 AC_PREREQ(2.62)
+LT_PREREQ(2.4)
 
 AC_INIT(SoX, 14.4.3git, sox-devel@lists.sourceforge.net)
 
@@ -23,6 +24,8 @@ AC_PROG_CC
 AM_PROG_CC_C_O
 AC_PROG_INSTALL
 AC_PROG_LN_S
+
+AX_APPEND_LINK_FLAGS([-Wl,--as-needed])
 
 dnl Increase version when binary compatibility with previous version is broken
 SHLIB_VERSION=3:0:0
@@ -163,17 +166,8 @@ fi
 
 dnl Extra CFLAGS if we have gcc
 if test "$GCC" = "yes"; then
+    CFLAGS="$CFLAGS -Wall -Wmissing-prototypes -Wstrict-prototypes"
 
-    AC_MSG_CHECKING([gcc version])
-    gccver=`$CC -dumpversion`
-    AC_MSG_RESULT($gccver)
-
-    CFLAGS="$CFLAGS -Wall -W -Wmissing-prototypes -Wstrict-prototypes -pedantic"
-
-    AS_VERSION_COMPARE([$gccver], [4.3],
-       [WARN_CFLAGS="-Wconversion"],
-       [WARN_CFLAGS="-Wtraditional-conversion"],
-       [WARN_CFLAGS="-Wtraditional-conversion"])
     dnl Define stricter policy on GNU/Linux, all symbols must be resolved
     case $target in
       *linux* | *solaris*)
@@ -185,7 +179,6 @@ if test "$GCC" = "yes"; then
     esac
 fi
 AC_SUBST(APP_LDFLAGS)
-AC_SUBST(WARN_CFLAGS)
 
 AC_ARG_WITH(distro, AS_HELP_STRING([--with-distro=distro], [Provide distribution name]))
 if test "x$with_distro" != "x"; then
@@ -204,10 +197,10 @@ AC_C_INLINE
 
 dnl Checks for header files.
 AC_HEADER_STDC
-AC_CHECK_HEADERS(fcntl.h unistd.h byteswap.h sys/stat.h sys/time.h sys/timeb.h sys/types.h sys/utsname.h termios.h glob.h fenv.h)
+AC_CHECK_HEADERS(fcntl.h unistd.h byteswap.h sys/ioctl.h sys/stat.h sys/time.h sys/timeb.h sys/types.h sys/utsname.h termios.h glob.h fenv.h)
 
 dnl Checks for library functions.
-AC_CHECK_FUNCS(strcasecmp strdup popen vsnprintf gettimeofday mkstemp fmemopen)
+AC_CHECK_FUNCS(strcasecmp strdup popen vsnprintf gettimeofday mkstemp fmemopen sigaction)
 
 dnl Check if math library is needed.
 AC_SEARCH_LIBS([pow], [m])
@@ -217,18 +210,6 @@ AC_CHECK_FUNCS([lrint])
 dnl Large File Support
 AC_SYS_LARGEFILE
 AC_FUNC_FSEEKO
-if test "$ac_cv_sys_file_offset_bits" = "64"; then
-  dnl This is either a 64-bit platform or a 32-bit platform
-  dnl that supports large files.
-  dnl There are to many broken glibc+kernel's out there that
-  dnl detect 64-bit off_t on 32-bit system and require
-  dnl _LARGEFILE_SOURCE to make fseeko() go into 64-bit mode.
-  dnl Force defining _LARGEFILE_SOURCE always.  My assumption
-  dnl is its harmlessly ignored on 64-bit platforms and platforms
-  dnl that chose other solutions.
-  AC_MSG_NOTICE(Forcing _LARGEFILE_SOURCE to be safe since off_t is 64 bits)
-  AC_DEFINE(_LARGEFILE_SOURCE, 1)
-fi
 
 dnl Allow libtool to be silenced
 AC_MSG_CHECKING([whether libtool should be silenced])
@@ -266,22 +247,6 @@ AC_SUBST(LIBLTDL)
 
 dnl Check for OpenMP
 AC_OPENMP
-if test "x$OPENMP_CFLAGS" != "x"; then  dnl Old libtool workaround start
-  AC_MSG_CHECKING([for libtool version])
-  lt_version="`grep '^VERSION' $srcdir/ltmain.sh | sed -e 's/VERSION\=//g;s/ .*//g;s/"//g'`"
-  AS_VERSION_COMPARE([$lt_version], [2.4],
-    [AS_IF([test "$GCC" = "yes"],
-       [AC_MSG_RESULT([$lt_version, needs OpenMP linker workaround])
-        GOMP_LIBS="-lgomp"],
-       [AC_MSG_RESULT([$lt_version and not GCC, deactivating OpenMP])
-        OPENMP_CFLAGS=""])],
-    [AC_MSG_RESULT([$lt_version, OK])],
-    [AC_MSG_RESULT([$lt_version, OK])])
-fi
-AC_SUBST(GOMP_LIBS)  dnl Old libtool workaround end.
-                     dnl Only necessary if libtool version < 2.4, as older
-                     dnl versions don't pass on "-fopenmp" to the linker.
-                     dnl One day, replace with LT_PREREQ([2.4]) above.
 CFLAGS="$CFLAGS $OPENMP_CFLAGS"
 
 
@@ -454,13 +419,6 @@ found_libgsm=yes
 AC_CHECK_HEADERS(gsm/gsm.h, ,
     [AC_CHECK_HEADERS(gsm.h, ,found_libgsm=no)])
     AC_CHECK_LIB(gsm, gsm_create, GSM_LIBS="$GSM_LIBS -lgsm", found_libgsm=no)
-if test "$found_libgsm" = yes; then
-    AC_DEFINE(EXTERNAL_GSM, 1, [Define if you are using an external GSM library])
-else
-    LIBGSM_LIBADD=../libgsm/libgsm.la
-fi
-AM_CONDITIONAL(EXTERNAL_GSM, test x$found_libgsm = xyes)
-AC_SUBST(LIBGSM_LIBADD)
 
 
 
@@ -491,22 +449,11 @@ AC_OPTIONAL_FORMAT(oggvorbis, OGG_VORBIS, [AC_CHECK_HEADER(vorbis/codec.h,
 AC_OPTIONAL_FORMAT(opus, OPUS,
   [PKG_CHECK_MODULES(OPUS, [opusfile], [], using_opus=no)],
   using_opus=no)
-if test "$GCC" = "yes"; then
-  OPUS_CFLAGS="$OPUS_CFLAGS -Wno-long-long"
-fi
 
 
-# Check for FLAC libraries
-#  Note passing in OGG_VORBIS_LIBS.  That is because FLAC has optional
-#  support for OGG and if OGG libraries are found on this
-#  system then its highly likely to be compiled into FLAC
-#  and will require these at link time.
-case $target in
-  *mingw*)
-  FLAC_LIBS="-lwsock32"
-  ;;
-esac
-AC_OPTIONAL_FORMAT(flac, FLAC, [AC_CHECK_HEADER(FLAC/all.h, [AC_CHECK_DECL(FLAC_API_VERSION_CURRENT, [AC_CHECK_LIB(FLAC, FLAC__stream_encoder_new, FLAC_LIBS="-lFLAC $FLAC_LIBS $OGG_VORBIS_LIBS",using_flac=no, $FLAC_LIBS $OGG_VORBIS_LIBS)], using_flac=no, [#include <FLAC/all.h>])], using_flac=no)], using_flac=no)
+dnl Check for FLAC library
+AC_OPTIONAL_FORMAT(flac, FLAC,
+    [PKG_CHECK_MODULES([FLAC], [flac], [], [using_flac=no])])
 
 
 dnl When enable_dl_amrbw, do not let add libraries to be linked in
@@ -597,7 +544,7 @@ AC_ARG_ENABLE(dl_sndfile,
 	      AS_HELP_STRING([--enable-dl-sndfile], 
 			     [Dlopen sndfile instead of linking in.]),
 			     enable_dl_sndfile=$enableval, enable_dl_sndfile=no)
-if test "x$using_sndfile" = "xyes"; then
+if test "x$tmp_using_sndfile" = "xyes"; then
   if test "x$using_libltdl" = "xyes" -a "x$enable_dl_sndfile" = "xyes"; then
     AC_DEFINE(DL_SNDFILE, 1, [Define to dlopen() sndfile.]) 
     dnl When enable_dl_sndfile, do not let SOX_PATH_SNDFILE add libraries
@@ -611,10 +558,7 @@ AC_OPTIONAL_FORMAT(sndfile, SNDFILE, [using_sndfile=$tmp_using_sndfile])
 
 
 
-AC_OPTIONAL_FORMAT(oss, OSS, [AC_CHECK_HEADERS(sys/soundcard.h,,
-      [AC_CHECK_HEADERS(machine/soundcard.h,
-	  [AC_CHECK_LIB(ossaudio, _oss_ioctl, OSS_LIBS="$OSS_LIBS -lossaudio")],
-	  using_oss=no)])])
+AC_OPTIONAL_FORMAT(oss, OSS, [AC_CHECK_HEADERS(sys/soundcard.h,, using_oss=no)])
 
 
 
@@ -632,8 +576,7 @@ AC_OPTIONAL_FORMAT(mp3, MP3, [
 
 
 # GSM format depends on libgsm
-# No need to check; GSM is always found
-AC_OPTIONAL_FORMAT(gsm, GSM)
+AC_OPTIONAL_FORMAT(gsm, GSM, [using_gsm=$found_libgsm])
 
 
 
@@ -652,13 +595,13 @@ AC_MSG_RESULT($enable_symlinks)
 enable_playrec_symlinks=no
 if test "$enable_symlinks" = "yes"; then
   SYMLINKS=yes
-  if test false \
-      -o "$enable_alsa" = yes \
-      -o "$enable_ao" = yes \
-      -o "$enable_coreaudio" = yes \
-      -o "$enable_oss" = yes \
-      -o "$enable_pulseaudio" = yes \
-      -o "$enable_sndio" = yes \
+  if test "" \
+      -o "$using_alsa" = yes \
+      -o "$using_ao" = yes \
+      -o "$using_coreaudio" = yes \
+      -o "$using_oss" = yes \
+      -o "$using_pulseaudio" = yes \
+      -o "$using_sndio" = yes \
     ; then
     PLAYRECLINKS=yes
     enable_playrec_symlinks=yes
@@ -670,16 +613,8 @@ AC_SUBST(PLAYRECLINKS)
 AM_CONDITIONAL(STATIC_LIBSOX_ONLY, test "$enable_shared" = "no" -a "$enable_static" = "yes")
 
 dnl Generate output files.
-AC_CONFIG_FILES(Makefile src/Makefile libgsm/Makefile lpc10/Makefile msvc9/Makefile msvc10/Makefile sox.pc)
+AC_CONFIG_FILES(Makefile src/Makefile lpc10/Makefile sox.pc)
 AC_OUTPUT
-
-if test "$using_gsm" != "no"; then
-  if test "$found_libgsm" = "yes"; then
-    gsm_option="(external)"
-  else
-    gsm_option="(in-tree)"
-  fi
-fi
 
 if test "$using_lpc10" != "no"; then
   if test "$found_liblpc10" = "yes"; then
@@ -725,7 +660,7 @@ if test "x$using_amrwb" = "xyes"; then
 echo " dlopen amrwb..............$enable_dl_amrwb"
 fi
 echo "flac.......................$using_flac"
-echo "gsm........................$using_gsm $gsm_option"
+echo "gsm........................$using_gsm"
 echo "lpc10......................$using_lpc10 $lpc10_option"
 echo "mp2/mp3....................$using_mp3"
 echo " id3tag....................$using_id3tag"

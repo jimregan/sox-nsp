@@ -119,9 +119,10 @@ static void decoder_metadata_callback(FLAC__StreamDecoder const * const flac, FL
     p->total_samples = metadata->data.stream_info.total_samples;
   }
   else if (metadata->type == FLAC__METADATA_TYPE_VORBIS_COMMENT) {
+    const FLAC__StreamMetadata_VorbisComment *vc = &metadata->data.vorbis_comment;
     size_t i;
 
-    if (metadata->data.vorbis_comment.num_comments == 0)
+    if (vc->num_comments == 0)
       return;
 
     if (ft->oob.comments != NULL) {
@@ -129,8 +130,9 @@ static void decoder_metadata_callback(FLAC__StreamDecoder const * const flac, FL
       return;
     }
 
-    for (i = 0; i < metadata->data.vorbis_comment.num_comments; ++i)
-      sox_append_comment(&ft->oob.comments, (char const *) metadata->data.vorbis_comment.comments[i].entry);
+    for (i = 0; i < vc->num_comments; ++i)
+      if (vc->comments[i].entry)
+        sox_append_comment(&ft->oob.comments, (char const *) vc->comments[i].entry);
   }
 }
 
@@ -388,7 +390,7 @@ static FLAC__StreamEncoderTellStatus flac_stream_encoder_tell_callback(FLAC__Str
 static int start_write(sox_format_t * const ft)
 {
   priv_t * p = (priv_t *)ft->priv;
-  FLAC__StreamEncoderState status;
+  FLAC__StreamEncoderInitStatus status;
   unsigned compression_level = MAX_COMPRESSION; /* Default to "best" */
 
   if (ft->encoding.compression != HUGE_VAL) {
@@ -513,8 +515,8 @@ static int start_write(sox_format_t * const ft)
   status = FLAC__stream_encoder_init_stream(p->encoder, flac_stream_encoder_write_callback,
       flac_stream_encoder_seek_callback, flac_stream_encoder_tell_callback, flac_stream_encoder_metadata_callback, ft);
 
-  if (status != FLAC__STREAM_ENCODER_OK) {
-    lsx_fail_errno(ft, SOX_EINVAL, "%s", FLAC__StreamEncoderStateString[status]);
+  if (status != FLAC__STREAM_ENCODER_INIT_STATUS_OK) {
+    lsx_fail_errno(ft, SOX_EINVAL, "%s", FLAC__StreamEncoderInitStatusString[status]);
     return SOX_EOF;
   }
   return SOX_SUCCESS;

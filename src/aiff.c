@@ -62,7 +62,6 @@ int lsx_aiffstartread(sox_format_t * ft)
   size_t ssndsize = 0;
   char *annotation;
   char *author;
-  char *comment = NULL;
   char *copyright;
   char *nametext;
 
@@ -89,7 +88,7 @@ int lsx_aiffstartread(sox_format_t * ft)
   /* The SSND chunk must be the last in the file */
   while (1) {
     if (lsx_reads(ft, buf, (size_t)4) == SOX_EOF) {
-      if (ssndsize > 0)
+      if (seekto > 0)
         break;
       else {
         lsx_fail_errno(ft,SOX_EHDR,"Missing SSND chunk in AIFF file");
@@ -270,6 +269,7 @@ int lsx_aiffstartread(sox_format_t * ft)
       free(annotation);
     }
     else if (strncmp(buf, "COMT", (size_t)4) == 0) {
+      char *comment = NULL;
       rc = commentChunk(&comment, "Comment:", ft);
       if (rc) {
         /* Fail already called in function */
@@ -314,6 +314,8 @@ int lsx_aiffstartread(sox_format_t * ft)
       lsx_readdw(ft, &chunksize);
       if (lsx_eof(ft))
         break;
+      /* account for padding after odd-sized chunks */
+      chunksize += chunksize & 1;
       /* Skip the chunk using lsx_readb() so we may read
          from a pipe */
       while (chunksize-- > 0) {
